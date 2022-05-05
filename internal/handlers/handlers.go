@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"fmt"
-	"github.com/wfabjanczuk/awesomeProjectSlack/internal/models"
 	"github.com/wfabjanczuk/awesomeProjectSlack/internal/requests"
 	"github.com/wfabjanczuk/awesomeProjectSlack/internal/responses"
 	"log"
@@ -22,9 +21,9 @@ func WSEndpoint(w http.ResponseWriter, r *http.Request) {
 
 	conn := WSConnection{
 		connection: ws,
-		channel:    *publicChannel,
+		channel:    PublicChannel,
 	}
-	channels[*publicChannel] = append(channels[*publicChannel], conn)
+	channels[PublicChannel] = append(channels[PublicChannel], conn)
 
 	err = ws.WriteJSON(wsResponse)
 	if err != nil {
@@ -72,7 +71,7 @@ func ListenToRequestQueue() {
 	}
 }
 
-func broadcastToChannel(channel models.Channel, response responses.WSResponse) {
+func broadcastToChannel(channel string, response responses.WSResponse) {
 	for _, clientConnection := range channels[channel] {
 		err := clientConnection.GetWSConnection().WriteJSON(response)
 		if err != nil {

@@ -1,12 +1,10 @@
 package handlers
 
 import (
-	"github.com/wfabjanczuk/awesomeProjectSlack/internal/models"
 	"github.com/wfabjanczuk/awesomeProjectSlack/internal/requests"
 )
 
-var publicChannel = &models.Channel{
-	Name: "public",
-}
+const PublicChannel = "public"
+
 var requestQueue = make(chan *requests.WSRequest)
-var channels = make(map[models.Channel][]WSConnection)
+var channels = make(map[string][]WSConnection)

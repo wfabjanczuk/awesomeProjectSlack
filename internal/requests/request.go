@@ -2,12 +2,11 @@ package requests
 
 import (
 	"github.com/gorilla/websocket"
-	"github.com/wfabjanczuk/awesomeProjectSlack/internal/models"
 )
 
 type ClientConnection interface {
 	GetWSConnection() *websocket.Conn
-	GetChannel() models.Channel
+	GetChannel() string
 }
 
 type WSPayload struct {

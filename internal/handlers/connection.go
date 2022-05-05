@@ -2,20 +2,19 @@ package handlers
 
 import (
 	"github.com/gorilla/websocket"
-	"github.com/wfabjanczuk/awesomeProjectSlack/internal/models"
 	"net/http"
 )
 
 type WSConnection struct {
 	connection *websocket.Conn
-	channel    models.Channel
+	channel    string
 }
 
 func (w *WSConnection) GetWSConnection() *websocket.Conn {
 	return w.connection
 }
 
-func (w *WSConnection) GetChannel() models.Channel {
+func (w *WSConnection) GetChannel() string {
 	return w.channel
 }
 
