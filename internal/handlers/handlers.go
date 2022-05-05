@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"github.com/wfabjanczuk/awesomeProjectSlack/internal/connections"
 	"github.com/wfabjanczuk/awesomeProjectSlack/internal/requests"
-	"github.com/wfabjanczuk/awesomeProjectSlack/internal/responses"
 	"log"
 	"net/http"
 )
@@ -22,19 +21,19 @@ func InitConnection(w http.ResponseWriter, r *http.Request) {
 	channels[PublicChannel].Add(clientConnection)
 
 	sendSuccessMessage(clientConnection, "Connected to the server")
-	go ListenForWS(clientConnection)
+	go listenOnClientConnection(clientConnection)
 }
 
-func ListenForWS(clientConnection *connections.ClientConnection) {
+func listenOnClientConnection(clientConnection *connections.ClientConnection) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Println("Error", fmt.Sprintf("%v", r))
 		}
 	}()
 
-	var payload requests.WSPayload
-
 	for {
+		var payload requests.WSPayload
+
 		err := clientConnection.GetWSConnection().ReadJSON(&payload)
 		if err != nil {
 			log.Println(err)
@@ -49,15 +48,14 @@ func ListenForWS(clientConnection *connections.ClientConnection) {
 	}
 }
 
-func ListenToRequestQueue() {
+func ListenOnRequestQueue() {
 	for {
 		wsRequest := <-requestQueue
-		channelName := wsRequest.ClientConnection.GetChannel()
 		payload := wsRequest.Payload
 
 		switch payload.Action {
 		case "broadcast":
-			broadcastToChannel(channelName, payload.Message)
+			broadcastToChannel(wsRequest.ClientConnection.GetChannel(), payload.Message)
 		case "create":
 			createChannel(wsRequest.Payload.Message, wsRequest.ClientConnection)
 		case "enter":
@@ -65,77 +63,5 @@ func ListenToRequestQueue() {
 		case "leave":
 			leaveChannel(wsRequest.ClientConnection)
 		}
-	}
-}
-
-func broadcastToChannel(channelName, message string) {
-	for clientConnection := range channels[channelName] {
-		sendSuccessMessage(clientConnection, message)
-	}
-}
-
-func createChannel(channelName string, clientConnection *connections.ClientConnection) {
-	if _, ok := channels[channelName]; ok {
-		errorMessage := fmt.Sprintf("Channel with name: \"%s\" already exists!", channelName)
-		sendErrorMessage(clientConnection, errorMessage)
-
-		return
-	}
-
-	channels[channelName] = NewClientConnectionSet()
-
-	successMessage := fmt.Sprintf("Channel with name: \"%s\" successfully created.", channelName)
-	sendSuccessMessage(clientConnection, successMessage)
-}
-
-func enterChannel(channelName string, clientConnection *connections.ClientConnection) {
-	if _, ok := channels[channelName]; !ok {
-		errorMessage := fmt.Sprintf("Channel with name: \"%s\" does not exist!", channelName)
-		sendErrorMessage(clientConnection, errorMessage)
-
-		return
-	}
-
-	lastChannel := clientConnection.GetChannel()
-
-	channels[clientConnection.GetChannel()].Delete(clientConnection)
-	clientConnection.SetChannel(channelName)
-	channels[channelName].Add(clientConnection)
-
-	successMessage := fmt.Sprintf("Successfully left channel with name: \"%s\" and entered channel \"%s\"", lastChannel, channelName)
-	sendSuccessMessage(clientConnection, successMessage)
-}
-
-func leaveChannel(clientConnection *connections.ClientConnection) {
-	lastChannel := clientConnection.GetChannel()
-
-	channels[clientConnection.GetChannel()].Delete(clientConnection)
-	clientConnection.SetChannel(PublicChannel)
-	channels[PublicChannel].Add(clientConnection)
-
-	successMessage := fmt.Sprintf("Successfully left channel with name: \"%s\" and entered channel \"%s\"", lastChannel, PublicChannel)
-	sendSuccessMessage(clientConnection, successMessage)
-}
-
-func sendErrorMessage(clientConnection *connections.ClientConnection, message string) {
-	sendWsResponse(clientConnection, responses.WSResponse{
-		Message: message,
-		Status:  responses.STATUS_ERROR,
-	})
-}
-
-func sendSuccessMessage(clientConnection *connections.ClientConnection, message string) {
-	sendWsResponse(clientConnection, responses.WSResponse{
-		Message: message,
-		Status:  responses.STATUS_OK,
-	})
-}
-
-func sendWsResponse(clientConnection *connections.ClientConnection, response responses.WSResponse) {
-	err := clientConnection.GetWSConnection().WriteJSON(response)
-	if err != nil {
-		log.Println("Websocket error: ", err)
-		channels[clientConnection.GetChannel()].Delete(clientConnection)
-		_ = clientConnection.GetWSConnection().Close()
 	}
 }

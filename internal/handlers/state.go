@@ -2,24 +2,9 @@ package handlers
 
 import (
 	"github.com/gorilla/websocket"
-	"github.com/wfabjanczuk/awesomeProjectSlack/internal/connections"
 	"github.com/wfabjanczuk/awesomeProjectSlack/internal/requests"
 	"net/http"
 )
-
-type ClientConnectionSet map[*connections.ClientConnection]struct{}
-
-func NewClientConnectionSet() ClientConnectionSet {
-	return make(ClientConnectionSet)
-}
-
-func (s ClientConnectionSet) Add(clientConnection *connections.ClientConnection) {
-	s[clientConnection] = struct{}{}
-}
-
-func (s ClientConnectionSet) Delete(clientConnection *connections.ClientConnection) {
-	delete(s, clientConnection)
-}
 
 const PublicChannel = "public"
 
