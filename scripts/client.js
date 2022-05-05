@@ -42,4 +42,11 @@ socket.send(JSON.stringify({
     message: "private"
 }));
 // Server: New message from client, action: "enter", message: "private"
-// Client: {"message":"Successfully entered channel with name: \"private\"","status":"OK"}
+// Client: {"message":"Successfully left channel with name: \"public\" and entered channel \"private\"","status":"OK"}
+
+socket.send(JSON.stringify({
+    action: "leave",
+    message: ""
+}));
+// Server: New message from client, action: "leave", message: ""
+// Client: {"message":"Successfully left channel with name: \"private\" and entered channel \"public\"","status":"OK"}

@@ -62,6 +62,8 @@ func ListenToRequestQueue() {
 			createChannel(wsRequest.Payload.Message, wsRequest.ClientConnection)
 		case "enter":
 			enterChannel(wsRequest.Payload.Message, wsRequest.ClientConnection)
+		case "leave":
+			leaveChannel(wsRequest.ClientConnection)
 		}
 	}
 }
@@ -94,15 +96,26 @@ func enterChannel(channelName string, clientConnection *connections.ClientConnec
 		return
 	}
 
+	lastChannel := clientConnection.GetChannel()
+
 	channels[clientConnection.GetChannel()].Delete(clientConnection)
 	clientConnection.SetChannel(channelName)
 	channels[channelName].Add(clientConnection)
 
-	successMessage := fmt.Sprintf("Successfully entered channel with name: \"%s\"", channelName)
+	successMessage := fmt.Sprintf("Successfully left channel with name: \"%s\" and entered channel \"%s\"", lastChannel, channelName)
 	sendSuccessMessage(clientConnection, successMessage)
 }
 
-// TODO: func leaveChannel
+func leaveChannel(clientConnection *connections.ClientConnection) {
+	lastChannel := clientConnection.GetChannel()
+
+	channels[clientConnection.GetChannel()].Delete(clientConnection)
+	clientConnection.SetChannel(PublicChannel)
+	channels[PublicChannel].Add(clientConnection)
+
+	successMessage := fmt.Sprintf("Successfully left channel with name: \"%s\" and entered channel \"%s\"", lastChannel, PublicChannel)
+	sendSuccessMessage(clientConnection, successMessage)
+}
 
 func sendErrorMessage(clientConnection *connections.ClientConnection, message string) {
 	sendWsResponse(clientConnection, responses.WSResponse{
