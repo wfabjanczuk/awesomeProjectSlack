@@ -18,6 +18,10 @@ func (w *WSConnection) GetChannel() string {
 	return w.channel
 }
 
+func (w *WSConnection) SetChannel(channelName string) {
+	w.channel = channelName
+}
+
 var wsUpgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,

@@ -7,6 +7,7 @@ import (
 type ClientConnection interface {
 	GetWSConnection() *websocket.Conn
 	GetChannel() string
+	SetChannel(channel string)
 }
 
 type WSPayload struct {
@@ -15,13 +16,13 @@ type WSPayload struct {
 }
 
 type WSRequest struct {
-	Payload    WSPayload
-	Connection ClientConnection
+	Payload          WSPayload
+	ClientConnection ClientConnection
 }
 
 func NewWSRequest(payload WSPayload, connection ClientConnection) *WSRequest {
 	return &WSRequest{
-		Payload:    payload,
-		Connection: connection,
+		Payload:          payload,
+		ClientConnection: connection,
 	}
 }

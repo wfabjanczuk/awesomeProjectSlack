@@ -7,4 +7,4 @@ import (
 const PublicChannel = "public"
 
 var requestQueue = make(chan *requests.WSRequest)
-var channels = make(map[string][]WSConnection)
+var channels = make(map[string][]*WSConnection)
