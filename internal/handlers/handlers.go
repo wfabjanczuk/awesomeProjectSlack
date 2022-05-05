@@ -61,7 +61,7 @@ func ListenOnRequestQueue() {
 		case "enter":
 			enterChannel(wsRequest.Payload.Message, wsRequest.ClientConnection)
 		case "leave":
-			leaveChannel(wsRequest.ClientConnection)
+			enterChannel(PublicChannel, wsRequest.ClientConnection)
 		}
 	}
 }

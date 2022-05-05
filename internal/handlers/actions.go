@@ -34,22 +34,17 @@ func enterChannel(channelName string, clientConnection *connections.ClientConnec
 	}
 
 	lastChannel := clientConnection.GetChannel()
+	if channelName == lastChannel {
+		successMessage := fmt.Sprintf("You already are on channel with name: \"%s\"", channelName)
+		sendSuccessMessage(clientConnection, successMessage)
+
+		return
+	}
 
 	channels[clientConnection.GetChannel()].Delete(clientConnection)
 	clientConnection.SetChannel(channelName)
 	channels[channelName].Add(clientConnection)
 
 	successMessage := fmt.Sprintf("Successfully left channel with name: \"%s\" and entered channel \"%s\"", lastChannel, channelName)
-	sendSuccessMessage(clientConnection, successMessage)
-}
-
-func leaveChannel(clientConnection *connections.ClientConnection) {
-	lastChannel := clientConnection.GetChannel()
-
-	channels[clientConnection.GetChannel()].Delete(clientConnection)
-	clientConnection.SetChannel(PublicChannel)
-	channels[PublicChannel].Add(clientConnection)
-
-	successMessage := fmt.Sprintf("Successfully left channel with name: \"%s\" and entered channel \"%s\"", lastChannel, PublicChannel)
 	sendSuccessMessage(clientConnection, successMessage)
 }
