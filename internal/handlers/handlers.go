@@ -66,7 +66,7 @@ func ListenToRequestQueue() {
 		case "broadcast":
 			broadcastToChannel(channel, responses.WSResponse{
 				Message: payload.Message,
-				Status:  responses.WS_STATUS_OK,
+				Status:  responses.STATUS_OK,
 			})
 		}
 	}

@@ -1,7 +1,8 @@
 package responses
 
 const (
-	WS_STATUS_OK = "OK"
+	STATUS_OK    = "OK"
+	STATUS_ERROR = "Error"
 )
 
 type WSResponse struct {
