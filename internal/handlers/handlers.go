@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"fmt"
-	"github.com/gorilla/websocket"
 	"github.com/wfabjanczuk/awesomeProjectSlack/internal/connections"
 	"github.com/wfabjanczuk/awesomeProjectSlack/internal/requests"
 	"github.com/wfabjanczuk/awesomeProjectSlack/internal/responses"
@@ -18,14 +17,15 @@ func InitConnection(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println("Client connected to the endpoint")
 
-	conn := connections.NewClientConnection(wsConnection, PublicChannel)
-	channels[PublicChannel] = append(channels[PublicChannel], conn)
+	clientConnection := connections.NewClientConnection(wsConnection, PublicChannel)
+	channels[PublicChannel] = NewClientConnectionSet()
+	channels[PublicChannel].Add(clientConnection)
 
-	sendSuccessMessage(wsConnection, "Connected to the server")
-	go ListenForWS(conn)
+	sendSuccessMessage(clientConnection, "Connected to the server")
+	go ListenForWS(clientConnection)
 }
 
-func ListenForWS(conn *connections.ClientConnection) {
+func ListenForWS(clientConnection *connections.ClientConnection) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Println("Error", fmt.Sprintf("%v", r))
@@ -35,16 +35,16 @@ func ListenForWS(conn *connections.ClientConnection) {
 	var payload requests.WSPayload
 
 	for {
-		err := conn.GetWSConnection().ReadJSON(&payload)
+		err := clientConnection.GetWSConnection().ReadJSON(&payload)
 		if err != nil {
 			log.Println(err)
-			sendErrorMessage(conn.GetWSConnection(), "Invalid JSON payload!")
+			sendErrorMessage(clientConnection, "Invalid JSON payload!")
 
 			break
 		} else {
 			fmt.Printf("New message from client, action: \"%s\", message: \"%s\"\n", payload.Action, payload.Message)
 
-			requestQueue <- requests.NewWSRequest(payload, conn)
+			requestQueue <- requests.NewWSRequest(payload, clientConnection)
 		}
 	}
 }
@@ -59,7 +59,7 @@ func ListenToRequestQueue() {
 		case "broadcast":
 			broadcastToChannel(channelName, payload.Message)
 		case "create":
-			createChannel(wsRequest.Payload.Message, wsRequest.ClientConnection.GetWSConnection())
+			createChannel(wsRequest.Payload.Message, wsRequest.ClientConnection)
 		case "enter":
 			enterChannel(wsRequest.Payload.Message, wsRequest.ClientConnection)
 		}
@@ -67,61 +67,62 @@ func ListenToRequestQueue() {
 }
 
 func broadcastToChannel(channelName, message string) {
-	for _, clientConnection := range channels[channelName] {
-		sendSuccessMessage(clientConnection.GetWSConnection(), message)
+	for clientConnection := range channels[channelName] {
+		sendSuccessMessage(clientConnection, message)
 	}
 }
 
-func createChannel(channelName string, wsConnection *websocket.Conn) {
+func createChannel(channelName string, clientConnection *connections.ClientConnection) {
 	if _, ok := channels[channelName]; ok {
 		errorMessage := fmt.Sprintf("Channel with name: \"%s\" already exists!", channelName)
-		sendErrorMessage(wsConnection, errorMessage)
+		sendErrorMessage(clientConnection, errorMessage)
 
 		return
 	}
 
-	channels[channelName] = []*connections.ClientConnection{}
+	channels[channelName] = NewClientConnectionSet()
 
 	successMessage := fmt.Sprintf("Channel with name: \"%s\" successfully created.", channelName)
-	sendSuccessMessage(wsConnection, successMessage)
+	sendSuccessMessage(clientConnection, successMessage)
 }
 
 func enterChannel(channelName string, clientConnection *connections.ClientConnection) {
 	if _, ok := channels[channelName]; !ok {
 		errorMessage := fmt.Sprintf("Channel with name: \"%s\" does not exist!", channelName)
-		sendErrorMessage(clientConnection.GetWSConnection(), errorMessage)
+		sendErrorMessage(clientConnection, errorMessage)
 
 		return
 	}
 
+	channels[clientConnection.GetChannel()].Delete(clientConnection)
 	clientConnection.SetChannel(channelName)
-	channels[channelName] = append(channels[channelName], clientConnection)
+	channels[channelName].Add(clientConnection)
 
 	successMessage := fmt.Sprintf("Successfully entered channel with name: \"%s\"", channelName)
-	sendSuccessMessage(clientConnection.GetWSConnection(), successMessage)
+	sendSuccessMessage(clientConnection, successMessage)
 }
 
-// TODO: func enterChannel, func leaveChannel
+// TODO: func leaveChannel
 
-func sendErrorMessage(wsConnection *websocket.Conn, message string) {
-	sendWsResponse(wsConnection, responses.WSResponse{
+func sendErrorMessage(clientConnection *connections.ClientConnection, message string) {
+	sendWsResponse(clientConnection, responses.WSResponse{
 		Message: message,
 		Status:  responses.STATUS_ERROR,
 	})
 }
 
-func sendSuccessMessage(wsConnection *websocket.Conn, message string) {
-	sendWsResponse(wsConnection, responses.WSResponse{
+func sendSuccessMessage(clientConnection *connections.ClientConnection, message string) {
+	sendWsResponse(clientConnection, responses.WSResponse{
 		Message: message,
 		Status:  responses.STATUS_OK,
 	})
 }
 
-func sendWsResponse(wsConnection *websocket.Conn, response responses.WSResponse) {
-	err := wsConnection.WriteJSON(response)
+func sendWsResponse(clientConnection *connections.ClientConnection, response responses.WSResponse) {
+	err := clientConnection.GetWSConnection().WriteJSON(response)
 	if err != nil {
 		log.Println("Websocket error: ", err)
-		_ = wsConnection.Close()
-		// TODO: remove closed connection from state (especially from channels map)
+		channels[clientConnection.GetChannel()].Delete(clientConnection)
+		_ = clientConnection.GetWSConnection().Close()
 	}
 }
