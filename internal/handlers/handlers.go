@@ -3,38 +3,29 @@ package handlers
 import (
 	"fmt"
 	"github.com/gorilla/websocket"
+	"github.com/wfabjanczuk/awesomeProjectSlack/internal/connections"
 	"github.com/wfabjanczuk/awesomeProjectSlack/internal/requests"
 	"github.com/wfabjanczuk/awesomeProjectSlack/internal/responses"
 	"log"
 	"net/http"
 )
 
-func WSEndpoint(w http.ResponseWriter, r *http.Request) {
-	ws, err := wsUpgrader.Upgrade(w, r, nil)
+func InitConnection(w http.ResponseWriter, r *http.Request) {
+	wsConnection, err := wsUpgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Println(err)
+		return
 	}
 	log.Println("Client connected to the endpoint")
 
-	wsResponse := responses.WSResponse{
-		Message: `Connected to the server`,
-	}
-
-	conn := &WSConnection{
-		connection: ws,
-		channel:    PublicChannel,
-	}
+	conn := connections.NewClientConnection(wsConnection, PublicChannel)
 	channels[PublicChannel] = append(channels[PublicChannel], conn)
 
-	err = ws.WriteJSON(wsResponse)
-	if err != nil {
-		log.Println("Failed to write JSON:", err)
-	}
-
+	sendSuccessMessage(wsConnection, "Connected to the server")
 	go ListenForWS(conn)
 }
 
-func ListenForWS(conn *WSConnection) {
+func ListenForWS(conn *connections.ClientConnection) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Println("Error", fmt.Sprintf("%v", r))
@@ -69,6 +60,8 @@ func ListenToRequestQueue() {
 			broadcastToChannel(channelName, payload.Message)
 		case "create":
 			createChannel(wsRequest.Payload.Message, wsRequest.ClientConnection.GetWSConnection())
+		case "enter":
+			enterChannel(wsRequest.Payload.Message, wsRequest.ClientConnection)
 		}
 	}
 }
@@ -87,10 +80,25 @@ func createChannel(channelName string, wsConnection *websocket.Conn) {
 		return
 	}
 
-	channels[channelName] = []*WSConnection{}
+	channels[channelName] = []*connections.ClientConnection{}
 
 	successMessage := fmt.Sprintf("Channel with name: \"%s\" successfully created.", channelName)
 	sendSuccessMessage(wsConnection, successMessage)
+}
+
+func enterChannel(channelName string, clientConnection *connections.ClientConnection) {
+	if _, ok := channels[channelName]; !ok {
+		errorMessage := fmt.Sprintf("Channel with name: \"%s\" does not exist!", channelName)
+		sendErrorMessage(clientConnection.GetWSConnection(), errorMessage)
+
+		return
+	}
+
+	clientConnection.SetChannel(channelName)
+	channels[channelName] = append(channels[channelName], clientConnection)
+
+	successMessage := fmt.Sprintf("Successfully entered channel with name: \"%s\"", channelName)
+	sendSuccessMessage(clientConnection.GetWSConnection(), successMessage)
 }
 
 // TODO: func enterChannel, func leaveChannel
@@ -112,8 +120,8 @@ func sendSuccessMessage(wsConnection *websocket.Conn, message string) {
 func sendWsResponse(wsConnection *websocket.Conn, response responses.WSResponse) {
 	err := wsConnection.WriteJSON(response)
 	if err != nil {
-		log.Println("Websocket err", err)
+		log.Println("Websocket error: ", err)
 		_ = wsConnection.Close()
-		// remove closed connection from state (especially from channels map)
+		// TODO: remove closed connection from state (especially from channels map)
 	}
 }

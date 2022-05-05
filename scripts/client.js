@@ -1,5 +1,6 @@
 const socket = new WebSocket("ws://localhost:8080/ws");
 // Server: Client connected to the endpoint
+// Client: {"message":"Connected to the server","status":"OK"}
 
 socket.send(JSON.stringify({
     action: "broadcast",
@@ -28,3 +29,17 @@ socket.send(JSON.stringify({
 }));
 // Server: New message from client, action: "create", message: "private"
 // Client: {"message":"Channel with name: \"private\" successfully created.","status":"OK"}
+
+socket.send(JSON.stringify({
+    action: "enter",
+    message: "unknown"
+}));
+// Server: New message from client, action: "enter", message: "unknown"
+// Client: {"message":"Channel with name: \"unknown\" does not exist!","status":"Error"}
+
+socket.send(JSON.stringify({
+    action: "enter",
+    message: "private"
+}));
+// Server: New message from client, action: "enter", message: "private"
+// Client: {"message":"Successfully entered channel with name: \"private\"","status":"OK"}

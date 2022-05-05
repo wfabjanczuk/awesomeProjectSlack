@@ -1,14 +1,8 @@
 package requests
 
 import (
-	"github.com/gorilla/websocket"
+	"github.com/wfabjanczuk/awesomeProjectSlack/internal/connections"
 )
-
-type ClientConnection interface {
-	GetWSConnection() *websocket.Conn
-	GetChannel() string
-	SetChannel(channel string)
-}
 
 type WSPayload struct {
 	Action  string `json:"action"`
@@ -17,10 +11,10 @@ type WSPayload struct {
 
 type WSRequest struct {
 	Payload          WSPayload
-	ClientConnection ClientConnection
+	ClientConnection *connections.ClientConnection
 }
 
-func NewWSRequest(payload WSPayload, connection ClientConnection) *WSRequest {
+func NewWSRequest(payload WSPayload, connection *connections.ClientConnection) *WSRequest {
 	return &WSRequest{
 		Payload:          payload,
 		ClientConnection: connection,
