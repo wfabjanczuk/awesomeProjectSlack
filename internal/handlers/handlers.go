@@ -2,37 +2,12 @@ package handlers
 
 import (
 	"fmt"
-	"github.com/gorilla/websocket"
+	"github.com/wfabjanczuk/awesomeProjectSlack/internal/models"
+	"github.com/wfabjanczuk/awesomeProjectSlack/internal/requests"
+	"github.com/wfabjanczuk/awesomeProjectSlack/internal/responses"
 	"log"
 	"net/http"
 )
-
-type WSConnection struct {
-	*websocket.Conn
-}
-
-type WSPayload struct {
-	Action   string       `json:"action"`
-	Username string       `json:"username"`
-	Message  string       `json:"message"`
-	Conn     WSConnection `json:"-"`
-}
-
-type WSResponse struct {
-	Action         string   `json:"action"`
-	Message        string   `json:"message"`
-	MessageType    string   `json:"message_type"`
-	ConnectedUsers []string `json:"connected_users"`
-}
-
-var inputChan = make(chan WSPayload)
-var clients = make(map[WSConnection]string)
-
-var wsUpgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin:     func(r *http.Request) bool { return true },
-}
 
 func WSEndpoint(w http.ResponseWriter, r *http.Request) {
 	ws, err := wsUpgrader.Upgrade(w, r, nil)
@@ -41,68 +16,68 @@ func WSEndpoint(w http.ResponseWriter, r *http.Request) {
 	}
 	log.Println("Client connected to the endpoint")
 
-	response := WSResponse{
+	wsResponse := responses.WSResponse{
 		Message: `Connected to the server`,
 	}
 
 	conn := WSConnection{
-		Conn: ws,
+		connection: ws,
+		channel:    *publicChannel,
 	}
-	clients[conn] = ""
+	channels[*publicChannel] = append(channels[*publicChannel], conn)
 
-	err = ws.WriteJSON(response)
+	err = ws.WriteJSON(wsResponse)
 	if err != nil {
 		log.Println("Failed to write JSON:", err)
 	}
 
-	go ListenForWs(&conn)
+	go ListenForWS(&conn)
 }
 
-func ListenForWs(conn *WSConnection) {
+func ListenForWS(conn *WSConnection) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Println("Error", fmt.Sprintf("%v", r))
 		}
 	}()
 
-	var payload WSPayload
+	var payload requests.WSPayload
 
 	for {
-		err := conn.ReadJSON(&payload)
+		err := conn.GetWSConnection().ReadJSON(&payload)
 		if err != nil {
 			log.Println(err)
 			break
 		} else {
 			fmt.Println(payload)
 
-			payload.Conn = *conn
-			inputChan <- payload
+			requestQueue <- requests.NewWSRequest(payload, conn)
 		}
 	}
 }
 
-func ListenToWsChannel() {
-	var response WSResponse
-
+func ListenToRequestQueue() {
 	for {
-		event := <-inputChan
+		wsRequest := <-requestQueue
+		channel := wsRequest.Connection.GetChannel()
+		payload := wsRequest.Payload
 
-		switch event.Action {
+		switch payload.Action {
 		case "broadcast":
-			response.Action = "broadcast"
-			response.Message = event.Message
-			broadcastToAll(response)
+			broadcastToChannel(channel, responses.WSResponse{
+				Message: payload.Message,
+				Status:  responses.WS_STATUS_OK,
+			})
 		}
 	}
 }
 
-func broadcastToAll(response WSResponse) {
-	for client := range clients {
-		err := client.WriteJSON(response)
+func broadcastToChannel(channel models.Channel, response responses.WSResponse) {
+	for _, clientConnection := range channels[channel] {
+		err := clientConnection.GetWSConnection().WriteJSON(response)
 		if err != nil {
 			log.Println("Websocket err", err)
-			_ = client.Close()
-			delete(clients, client)
+			_ = clientConnection.GetWSConnection().Close()
 		}
 	}
 }
